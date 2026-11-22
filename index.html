@@ -1,0 +1,1101 @@
+<!doctype html>
+<html lang="en-AU">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SpecialList: grocery specials at five shops</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="SpecialList shows which of your usual groceries are on special this week at Woolworths, Coles, ALDI, IGA and Harris Farm. Join the Android beta.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap">
+<style>
+/* Layout: the page is a supermarket aisle. Sections stack like shelves, every price is drawn
+   as a shelf ticket that carries its date, and Maggie pops up from a yellow shelf-edge dock
+   at the bottom of the screen with one line per section. One look, taken from the app's own
+   yellow and black, so colours are set explicitly and there is no dark variant. */
+:root{
+  --paper:#FDF8F3; --ink:#121212; --yellow:#FFD400; --white:#FFFFFF;
+  --muted:#5C5750; --line:#E3DBCF; --steel:#D7D2CA; --steel-lo:#B9B3A9;
+  --green:#1F7A34; --green-bg:#E8F2EA; --amber:#8A4B00; --amber-bg:#FFF1DC;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --dock:78px; --max:1180px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:500 18px/1.5 var(--body);overflow-x:hidden;
+  padding-bottom:calc(var(--dock) + env(safe-area-inset-bottom,0px))}
+a:focus-visible,button:focus-visible,input:focus-visible,video:focus-visible{outline:3px solid #0B57D0;outline-offset:3px}
+h1,h2,h3{font-family:var(--cond);font-weight:700;margin:0;text-wrap:balance;letter-spacing:-.3px}
+h1{font-size:clamp(40px,4.6vw,62px);line-height:.96}
+h2{font-size:clamp(34px,4.1vw,54px);line-height:.98}
+h3{font-size:23px;line-height:1.05}
+p{margin:0}
+.in{max-width:var(--max);margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.lede{font-size:clamp(19px,1.7vw,22px);max-width:34em}
+.copy{display:grid;gap:18px;align-content:start;min-width:0}
+.copy>p{max-width:33em}
+.cap{font-size:14px;line-height:1.4;color:var(--muted)}
+.sec{padding-block:clamp(56px,8vw,104px)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,72px);align-items:center}
+#brand .split{align-items:start}
+
+/* Swing tag: the section's label, punched like a price tag */
+.tag{justify-self:start;display:inline-flex;align-items:center;gap:9px;background:var(--yellow);border:2px solid var(--ink);
+  border-radius:4px 10px 10px 4px;padding:5px 12px 5px 9px;font:700 15px/1 var(--cond);text-transform:uppercase;letter-spacing:1.4px;color:var(--ink)}
+.tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--paper);border:2px solid var(--ink);flex:none}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;background:var(--ink);color:var(--yellow);
+  font:700 21px/1 var(--cond);text-transform:uppercase;letter-spacing:.6px;padding:0 24px;border:0;border-radius:12px;
+  text-decoration:none;cursor:pointer;box-shadow:0 4px 0 #5F5200;transition:transform .12s ease-out,box-shadow .12s ease-out}
+.btn:hover{transform:translateY(-1px);box-shadow:0 5px 0 #5F5200}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #5F5200}
+
+/* ---------- Hero ---------- */
+.hero{padding-top:clamp(20px,3vw,36px)}
+.hero .in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(28px,4vw,64px);align-items:center}
+.mark{justify-self:start;font:800 30px/1 var(--cond);letter-spacing:.4px;color:var(--ink);text-decoration:none}
+.mark span{background:var(--yellow);padding:1px 6px;border-radius:5px;margin-left:3px}
+.hero .copy{gap:22px}
+.kicker{font:600 16px/1.3 var(--body);color:var(--muted)}
+.cta{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
+.cta .cap{font-size:15px}
+
+/* The hero is one real grid-view screen from the app (owner 14 Nov: grid is the view he uses most), the Tim Tam
+   list on 12 Nov. Four labels beside it each draw a line to the part of the screen they name (owner 19 Nov: "the
+   features and then a line to the features ... on the actual phone display"). They appear once, one after another,
+   when the phone comes into view; the resting style is the finished picture. Ring places are percent of the
+   540 x 1084 screen, measured from its pixels; each label's --ry and --rl repeat its ring's middle and left edge. */
+.demo{--pw:340px;--cw:190px;--g:22px;--aw:calc(var(--pw) - 18px);--ah:calc(var(--aw) * 1084 / 540);margin:0;
+  display:grid;grid-template-columns:var(--cw) var(--pw);column-gap:var(--g)}
+.demo .phone,.demo .ledge{grid-column:2}
+.cos{grid-column:1;grid-row:1;position:relative;list-style:none;margin:0;padding:0}
+.co{position:absolute;right:0;width:var(--cw);top:calc(9px + var(--ry) * var(--ah));transform:translateY(-50%);text-align:right;
+  display:grid;gap:2px;animation:coIn .4s ease-out both}
+.co b{font:700 20px/1.05 var(--cond);text-transform:uppercase;letter-spacing:.2px}
+.co span{font-size:15px;line-height:1.3;color:var(--muted)}
+.co i{position:absolute;left:calc(100% + 8px);top:50%;width:calc(var(--g) + 1px + var(--rl) * var(--aw));height:2px;margin-top:-1px;
+  background:var(--ink);transform-origin:left;animation:draw .35s ease-out both}
+.co i::after{content:"";position:absolute;right:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--ink)}
+.c1{--ry:.1555;--rl:.334;animation-delay:.2s}.c1 i{animation-delay:.45s}
+.c2{--ry:.307;--rl:.008;animation-delay:.8s}.c2 i{animation-delay:1.05s}
+.c3{--ry:.671;--rl:.144;animation-delay:1.4s}.c3 i{animation-delay:1.65s}
+.c4{--ry:.77;--rl:.038;animation-delay:2s}.c4 i{animation-delay:2.25s}
+.phone{border:9px solid var(--ink);border-bottom:0;border-radius:34px 34px 0 0;background:var(--ink);overflow:hidden}
+.app{position:relative;aspect-ratio:540/1084;overflow:hidden;background:#FDF7F2}
+.app img{display:block;width:100%;height:100%}
+.ring{position:absolute;border:3px solid var(--ink);border-radius:8px;box-shadow:0 0 0 3px var(--yellow);animation:coIn .3s ease-out both}
+.ring.r1{left:33.4%;top:11.8%;width:33.9%;height:7.5%;animation-delay:.7s}
+.ring.r2{left:.8%;top:27.6%;width:98.4%;height:6.2%;animation-delay:1.3s}
+.ring.r3{left:14.4%;top:65.6%;width:11.6%;height:3%;animation-delay:1.9s}
+.ring.r4{left:3.8%;top:68.8%;width:43.6%;height:16.4%;animation-delay:2.5s}
+@keyframes coIn{from{opacity:0}}
+@keyframes draw{from{transform:scaleX(0)}}
+/* Shelf edge the phone stands on. The ticket in its channel is the caption. */
+.ledge{margin-inline:-20px;background:linear-gradient(var(--ink) 0 7px,var(--steel) 7px calc(100% - 3px),var(--steel-lo) calc(100% - 3px));
+  padding:13px 12px 10px;display:flex;justify-content:center}
+.ledge span{background:var(--yellow);border:1.5px solid var(--ink);border-radius:3px;padding:3px 8px;font:700 13px/1.15 var(--cond);text-transform:uppercase;letter-spacing:.6px;text-align:center}
+@keyframes rise{from{opacity:0;transform:translateY(4px)}}
+
+/* The five shops, as tickets in a shelf channel */
+.shops{margin-top:clamp(40px,5vw,64px);background:linear-gradient(var(--ink) 0 8px,var(--steel) 8px calc(100% - 4px),var(--steel-lo) calc(100% - 4px));padding-block:20px 18px}
+.shops .in{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px 24px;align-items:center}
+.shops p{font:700 17px/1.15 var(--cond);text-transform:uppercase;letter-spacing:1px}
+.logos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.logos li{background:var(--white);border:1.5px solid var(--ink);border-radius:6px;height:58px;display:grid;place-items:center;padding:8px 10px}
+.logos img{height:30px;width:100%;object-fit:contain}
+
+/* ---------- Why it exists: the maker's own reason, then the six features it led to ---------- */
+.why .in{display:grid;gap:clamp(18px,2.4vw,28px)}
+.big{font:800 clamp(46px,7.4vw,96px)/.92 var(--cond);letter-spacing:-1px}
+.big s{color:var(--muted);text-decoration-thickness:5px}
+.big mark{background:var(--yellow);color:var(--ink);padding:0 .1em;border-radius:6px}
+.quote{margin:0;max-width:38em;font:500 clamp(19px,1.8vw,23px)/1.45 var(--body);border-left:6px solid var(--yellow);padding-left:16px}
+.quote cite{display:block;margin-top:8px;font:700 16px/1.2 var(--cond);font-style:normal;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.feats{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px;counter-reset:f}
+.feats a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:5px 14px 5px 5px;border:2px solid var(--ink);border-radius:999px;background:var(--white);
+  color:var(--ink);text-decoration:none;font:700 18px/1 var(--cond);text-transform:uppercase;letter-spacing:.5px}
+.feats a::before{counter-increment:f;content:counter(f);width:30px;height:30px;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);display:grid;place-items:center;font:800 16px/1 var(--cond)}
+.feats a:hover{background:var(--yellow)}
+
+/* Each feature section: its heading, then the maker's reason for it, in the maker's own words */
+.head{display:grid;gap:14px;justify-items:start;max-width:46em}
+.center .head{justify-items:center;text-align:center;margin-inline:auto}
+.said{margin:0;display:grid;gap:6px;font:500 clamp(18px,1.6vw,21px)/1.4 var(--body);max-width:32em}
+.said b{font:700 14px/1 var(--cond);text-transform:uppercase;letter-spacing:1.2px;color:var(--muted)}
+.dark .said b{color:#BDB6AA}
+/* A real screen in a plain phone frame */
+.ph{width:min(260px,64vw);border:8px solid var(--ink);border-radius:30px;overflow:hidden;background:var(--ink);line-height:0;margin:0}
+.ph img,.ph video{display:block;width:100%;height:auto;aspect-ratio:540/1084}
+.shots{display:grid;justify-items:center;gap:10px;margin:0;min-width:0}
+.shots figcaption{font:600 16px/1.35 var(--body);text-align:center;max-width:17em}
+.cap.mid{text-align:center;margin:clamp(18px,2.4vw,28px) auto 0;max-width:40em}
+/* Numbered how-to points */
+.pts{list-style:none;margin:0;padding:0;display:grid;gap:14px;counter-reset:p}
+.pts li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;font-size:17px;line-height:1.4}
+.pts li::before{counter-increment:p;content:counter(p);width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--yellow);display:grid;place-items:center;font:800 18px/1 var(--cond)}
+
+/* 1 Whole brands: the reason, the phone, the how, side by side */
+.trio{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(24px,4vw,56px);align-items:center;margin-top:clamp(28px,4vw,48px)}
+
+/* 2 Lists: three real lists fanned out like cards in a hand */
+.fan{position:relative;display:flex;justify-content:center;max-width:760px;margin:clamp(28px,4vw,48px) auto 0;padding-inline:4%}
+.fan .shots{flex:0 1 250px;transition:transform .6s cubic-bezier(.2,.8,.3,1)}
+.ph{position:relative}
+.fan .shots:nth-child(1):not(:only-child){transform:rotate(-5deg) translate(18%,14px)}
+.fan .shots:nth-child(2){z-index:1}
+.fan .shots:nth-child(3){transform:rotate(5deg) translate(-18%,14px)}
+.fan.wait .shots:nth-child(1),.fan.wait .shots:nth-child(3){transform:none}
+.fan .ph{width:100%;max-width:250px;box-shadow:0 8px 0 rgba(18,18,18,.18)}
+
+
+/* 4 Alerts: the real notification drops in over the two screens it came from */
+.alerts{background:var(--yellow)}
+.duo{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,3vw,32px);max-width:600px;margin:clamp(28px,4vw,40px) auto 0;padding-top:clamp(92px,11vw,136px)}
+.duo .ph{width:100%;max-width:260px}
+.note{position:absolute;z-index:1;top:0;left:50%;margin:0;width:min(460px,100%);transform:translateX(-50%);border:2px solid var(--ink);border-radius:18px;overflow:hidden;
+  box-shadow:0 8px 0 var(--ink);line-height:0;transition:opacity .5s ease-out,transform .5s cubic-bezier(.2,.9,.3,1.1)}
+.note img{display:block;width:100%;height:auto}
+.duo.wait .note{opacity:0;transform:translate(-50%,-24px)}
+
+/* 5 Price history: a dark band, the figures from the real chart beside it */
+.hist{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(28px,5vw,72px);align-items:center}
+
+/* ---------- Brand section ---------- */
+
+.replay{justify-self:start;min-height:40px;font:700 15px/1 var(--cond);text-transform:uppercase;letter-spacing:.5px;background:var(--white);
+  color:var(--ink);border:2px solid var(--ink);border-radius:8px;padding:0 14px;cursor:pointer}
+.replay:hover{background:var(--yellow)}
+
+/* ---------- Reels: real clips and screens from the app, one step at a time, with one mark at a time on top
+   (a tap, a highlighter stroke or a spotlight; never a zoom). Each plays once when it comes into view and stays
+   on its last step. Marks are placed in percent of the 1080 x 2168 screen, measured from its pixels. ---------- */
+.reel{margin:0;display:grid;justify-items:center;gap:10px;min-width:0}
+.rscr{position:relative;width:min(290px,72vw);aspect-ratio:540/1084;border:9px solid var(--ink);border-radius:34px;overflow:hidden;background:#FDF7F2;box-sizing:content-box}
+.st{position:absolute;inset:0;opacity:0;transition:opacity .4s ease-out}
+.st.cur{opacity:1}
+.st video,.st img{display:block;width:100%;height:100%}
+.rz{position:absolute;inset:0}
+.rtap{position:absolute;left:var(--x);top:var(--y);width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:var(--ink);opacity:0;pointer-events:none}
+.rtap.on{animation:tap .5s ease-out}
+.rhl{position:absolute;background:var(--yellow);mix-blend-mode:multiply;border-radius:2px;transform:scaleX(0);transform-origin:left;transition:transform .35s ease-out}
+.rhl.on{transform:none}
+.rsay{font:600 17px/1.35 var(--body);min-height:2.7em;text-align:center;max-width:21em}
+.rsay.new{animation:rise .25s ease-out}
+.reel .replay{justify-self:center}
+.reel .cap{text-align:center;max-width:26em}
+
+/* ---------- Local store, on a dark shelf ---------- */
+.dark{background:var(--ink);color:var(--white)}
+.dark .copy>p{color:#E9E4DB}
+.dark h2{color:var(--yellow)}
+.dark .cap{color:#BDB6AA}
+
+/* ---------- How it works ---------- */
+
+/* ---------- Join ---------- */
+.join{background:var(--yellow)}
+.join .in{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(28px,5vw,72px);align-items:start}
+form{display:grid;gap:12px;max-width:460px}
+label{font:700 17px/1.2 var(--body)}
+input[type=email]{width:100%;min-height:54px;font:500 18px/1.2 var(--body);padding:12px 14px;border:2.5px solid var(--ink);border-radius:12px;background:var(--white);color:var(--ink)}
+.sent{font-weight:700;background:var(--white);border:2px solid var(--ink);border-radius:10px;padding:10px 12px;justify-self:start}
+.facts{list-style:none;margin:0;padding:0;display:grid;gap:0;border-top:2px solid var(--ink)}
+.facts li{border-bottom:2px solid var(--ink);padding:12px 0;font-size:16px;line-height:1.4}
+.facts b{font:700 20px/1.1 var(--cond);display:block;margin-bottom:2px}
+.also{display:grid;gap:10px}
+.also .facts{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:0 20px;border-top:0}
+.also .facts li{border-top:2px solid var(--ink);border-bottom:0}
+.join .also{grid-column:1/-1}
+.pre{font-size:16px;line-height:1.4;background:var(--white);border:2px solid var(--ink);border-radius:10px;padding:10px 12px}
+footer{background:var(--ink);color:#E9E4DB;font-size:14px;line-height:1.45;padding-block:22px}
+footer p{max-width:62em}
+
+/* ---------- Maggie's dock ---------- */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--yellow);border-top:3px solid var(--ink);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.dock .in{height:var(--dock);display:flex;align-items:center;gap:12px}
+.mag{flex:none;align-self:flex-end;width:74px;height:74px;overflow:hidden;position:relative}
+.mag img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center bottom;transition:transform .24s cubic-bezier(.2,.9,.3,1.15)}
+.mag.dn img{transform:translateY(102%);transition:transform .16s ease-in}
+.bubble{position:relative;flex:1;min-width:0;align-self:center;background:var(--white);border:2px solid var(--ink);border-radius:12px;padding:8px 12px;
+  font:600 16px/1.25 var(--body);transition:opacity .16s}
+.bubble::before{content:"";position:absolute;left:-8px;top:50%;width:12px;height:12px;margin-top:-6px;background:var(--white);border:solid var(--ink);border-width:0 0 2px 2px;transform:rotate(45deg)}
+.bubble.fade{opacity:0}
+.dock .btn{flex:none;min-height:46px;font-size:18px;padding:0 18px}
+/* Hidden while the hero's own button or the form is on screen, so there is one Join button at a time */
+.dock.at-form .btn,.dock.at-top .btn{visibility:hidden}
+
+/* ---------- Drawn graphics, one per section. Each plays once when it comes into view. The resting style is the
+   last frame and the keyframes run from the first, so without motion or without the script the finished
+   picture shows. Every price in them is real and carries its date. ---------- */
+.js [data-go]:not(.go) *{animation-play-state:paused!important}
+@keyframes pop{from{opacity:0;transform:scale(.4) rotate(-8deg)}}
+@keyframes up{from{opacity:0;transform:translateY(24px)}}
+
+/* Why: in the heading, the $16 is cut in half, then the $8 pops in */
+.c16{position:relative;display:inline-block;color:var(--muted)}
+.c16 .ca,.c16 .cb{display:inline-block;text-decoration:line-through 5px var(--muted);animation:dim .4s 1.1s both}
+.c16 .ca{clip-path:inset(-20% 50% -20% -20%)}
+.c16 .cb{position:absolute;left:0;top:0;clip-path:inset(-20% -20% -20% 50%);transform:translate(.06em,.1em) rotate(6deg);animation:dim .4s 1.1s both,fallr .5s 1.1s cubic-bezier(.5,0,.6,1.4) both}
+.c16 i{position:absolute;left:50%;top:-.04em;bottom:-.04em;border-left:4px dashed var(--ink);opacity:0;transform-origin:top;animation:blade .9s .2s both}
+@keyframes dim{from{color:var(--ink);text-decoration-color:transparent}}
+@keyframes fallr{from{transform:none}}
+@keyframes blade{0%{opacity:1;transform:scaleY(0)}60%{opacity:1;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1)}}
+.big .p8{display:inline-block;animation:pop .5s 1.6s cubic-bezier(.2,.9,.3,1.3) both}
+
+/* 3 Linking, on white and kept to about one screen: the story on the left, the linked product on the right */
+.lk{background:var(--white);padding-block:clamp(44px,5vw,72px)}
+.lkg{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(24px,4vw,56px);align-items:center}
+.lkp{display:flex;gap:16px;justify-content:center;align-items:start}
+.lkp .shots{flex:1 1 0;max-width:220px}
+.lkp .ph{width:100%}
+/* 4 Alerts: the price falls through your target line and the phone rings */
+.drop{position:relative;max-width:560px;height:150px;margin:clamp(24px,3vw,36px) auto 0;border-left:3px solid var(--ink);border-bottom:3px solid var(--ink);text-align:left}
+.drop .tl{position:absolute;left:0;right:72px;top:58px;border-top:3px dashed var(--ink)}
+.drop .tl span{position:absolute;left:12px;top:-28px;font:700 16px/1 var(--cond);text-transform:uppercase;letter-spacing:.5px}
+.drop .pd{position:absolute;left:20%;top:84px;background:var(--ink);color:var(--white);font:700 18px/1.1 var(--cond);padding:8px 12px;border-radius:8px;white-space:nowrap;
+  animation:sink 1.4s .3s cubic-bezier(.5,0,.4,1.3) both}
+@keyframes sink{0%{opacity:0;transform:translateY(-96px)}30%{opacity:1;transform:translateY(-96px)}}
+.bell{position:absolute;right:0;top:30px;width:56px;height:56px;border-radius:50%;background:var(--white);border:3px solid var(--ink);display:grid;place-items:center;animation:ring .9s 1.6s both}
+@keyframes ring{15%{transform:rotate(18deg)}30%{transform:rotate(-16deg)}45%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}75%{transform:rotate(4deg)}}
+
+/* 5 History: the real chart from the app, wiped in left to right */
+.hcrop{max-width:440px;aspect-ratio:540/400;overflow:hidden;border-radius:14px;background:#FBF7F1}
+.hcrop img{display:block;width:100%;height:auto;margin-top:-44.4%;animation:wipe 1.6s .2s ease-out both}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}}
+
+/* 6 Dated prices: the calendar turns to Wednesday and the price turns amber until it's checked again */
+.tick{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.cal{position:relative;flex:none;width:86px;height:98px;border:3px solid var(--ink);border-top-width:14px;border-radius:12px;background:var(--white);perspective:300px}
+.cal span{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font:700 14px/1 var(--cond);text-transform:uppercase;letter-spacing:.6px;backface-visibility:hidden}
+.cal b{display:block;font:800 40px/1 var(--cond)}
+.d1{opacity:0;animation:flipo .45s 1s ease-in both}
+.d2{animation:flipi .45s 1.45s ease-out both}
+@keyframes flipo{from{opacity:1;transform:none}to{opacity:0;transform:rotateX(90deg)}}
+@keyframes flipi{from{opacity:0;transform:rotateX(-90deg)}}
+.tkt{display:grid;gap:4px;padding:10px 16px;border:2px solid var(--ink);border-radius:10px;background:var(--amber-bg);color:var(--amber);animation:amb .6s 1.9s both}
+@keyframes amb{from{background:var(--white);color:var(--ink)}}
+.tkt b{font:800 44px/1 var(--cond)}
+.tkt .lb{display:grid;font:600 15px/1.3 var(--body)}
+.tkt .lb span{grid-area:1/1}
+.l1{opacity:0;animation:fadeo .4s 1.9s both}
+.l2{animation:fadei .4s 2.1s both}
+@keyframes fadeo{from{opacity:1}to{opacity:0}}
+@keyframes fadei{from{opacity:0}}
+
+/* Store: two Coles stores, two prices, the same day */
+.pins{display:flex;flex-wrap:wrap;gap:14px}
+.pin{display:grid;gap:4px;min-width:160px;padding:12px 16px;border-radius:14px 14px 14px 2px;background:#2A2A2A;border:2px solid #4A4A4A;color:var(--white);animation:drip .6s .2s cubic-bezier(.2,.9,.3,1.3) both}
+.pin b{font:800 42px/1 var(--cond)}
+.pin span{font:600 14px/1.3 var(--body);color:#BDB6AA}
+.pin.p2{background:var(--yellow);border-color:var(--yellow);color:var(--ink);animation-delay:.9s}
+.pin.p2 span{color:var(--ink)}
+@keyframes drip{from{opacity:0;transform:translateY(-40px)}}
+
+
+@media (max-width:900px){
+  .lkg{grid-template-columns:minmax(0,1fr)}
+  .fan .shots:not(:nth-child(2)) figcaption{visibility:hidden}
+}
+
+@media (max-width:1040px){
+  .hero .in{grid-template-columns:minmax(0,1fr)}
+  .demo{justify-self:start}
+}
+@media (max-width:900px){
+  .split,.join .in,.hist{grid-template-columns:minmax(0,1fr)}
+  .trio{grid-template-columns:minmax(0,1fr);justify-items:center}
+  .trio .said,.trio .pts{max-width:30em;width:100%}
+  .hist .ph{justify-self:center}
+  .shops .in{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  :root{--dock:70px}
+  body{font-size:17px}
+  .demo{--cw:clamp(100px,30vw,130px);--g:12px;--pw:min(250px,calc(100vw - 32px - var(--cw) - var(--g)));justify-self:center}
+  .demo .ledge{margin-right:0}
+  .co b{font-size:16px}
+  .co span{display:none}
+  .logos{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .logos li{height:50px}
+  .logos img{height:26px}
+  .feats a{font-size:16px;min-height:40px}
+  .shots figcaption{font-size:15px}
+  .fan{padding-inline:0}
+  .fan .shots:nth-child(1):not(:only-child){transform:rotate(-5deg) translate(14%,10px)}
+  .fan .shots:nth-child(3){transform:rotate(5deg) translate(-14%,10px)}
+  .fan .shots figcaption{font-size:13px}
+  .mag{width:62px;height:62px}
+  .bubble{font-size:14px;line-height:1.2;padding:6px 9px}
+  .dock .in{gap:10px;height:auto;min-height:var(--dock)}
+  .dock .btn{font-size:15px;padding:0 10px;min-height:42px}
+  .mark{font-size:26px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+
+<header class="hero" id="top" data-pose="p7-talk" data-say="I&#39;m Maggie. Save what you buy; each week I show what&#39;s on special.">
+  <div class="in">
+    <div class="copy">
+      <a class="mark" href="#top" aria-label="SpecialList">SPECIAL<span>LIST</span></a>
+      <p class="kicker">An Android app for Australian grocery shoppers</p>
+      <h1>See which of your groceries are on special this week</h1>
+      <p class="lede">Save what you buy once. Each week, see what’s on special at five supermarkets.</p>
+      <div class="cta"><a class="btn" id="heroBtn" href="#join">Join the beta</a><span class="cap">For Android phones. iPhone isn't ready yet.</span></div>
+    </div>
+
+    <figure class="demo2" id="demo2" data-go>
+      <div class="stand">
+        <div class="phone">
+          <div class="app" role="img" aria-label="The Tim Tam list in SpecialList, grid view, prices checked 12 Nov 2026. Tabs: Grocery 0, Tim Tam 41. On sale now: 27. Woolworths 10, specials until Tue 17 Nov. Arnott's Tim Tam Chewy Caramel 175 g, 12 Nov: IGA $3.60, save $2.40, was $6.00; Coles $6.00, pick any 2 for $8; Woolworths $6.00, 2 for $9.00. Arnott's Tim Tam Double Chocolate 200 g, 12 Nov: Woolworths $6.00, 2 for $9.00.">
+            <img src="media/grid.webp" width="540" height="1084" alt="">
+            <i class="ring r1"></i><i class="ring r2"></i><i class="ring r3"></i><i class="ring r4"></i>
+            <b class="hpin p1" style="left:67.8%;top:15.55%" aria-hidden="true">1</b>
+            <b class="hpin p2" style="left:56%;top:30.7%" aria-hidden="true">2</b>
+            <b class="hpin p3" style="left:28.4%;top:67.1%" aria-hidden="true">3</b>
+            <b class="hpin p4" style="left:47.8%;top:77%" aria-hidden="true">4</b>
+          </div>
+        </div>
+        <p class="cap hdate">Real screen · prices checked 12 Nov 2026</p>
+      </div>
+      <ol class="calls" id="calls">
+        <li class="k1" data-n="1"><b>A whole brand in one tap</b></li>
+        <li class="k2" data-n="2"><b>Specials at the top</b></li>
+        <li class="k3" data-n="3"><b>Every price has a date</b></li>
+        <li class="k4" data-n="4"><b>Cheaper somewhere else? It says so</b></li>
+      </ol>
+      <svg id="leads" aria-hidden="true"></svg>
+    </figure>
+  </div>
+
+  <div class="shops">
+    <div class="in">
+      <p>Checks prices at</p>
+      <ul class="logos">
+        <li><img src="logos/woolworths.webp" alt="Woolworths"></li>
+        <li><img src="logos/coles.webp" alt="Coles"></li>
+        <li><img src="logos/aldi.webp" alt="ALDI"></li>
+        <li><img src="logos/iga.webp" alt="IGA"></li>
+        <li><img src="logos/harrisfarm.webp" alt="Harris Farm"></li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="sec why" id="why" data-pose="p7-talk" data-say="Same Kirks pack on 14 Nov: Coles $8, IGA $9.60, Woolworths $16.">
+  <div class="in">
+    <span class="tag">Why it exists</span>
+    <h2 class="big" data-go><span class="c16"><span class="ca">$16</span><span class="cb" aria-hidden="true">$16</span><i></i></span> at one shop.<br><mark class="p8">$8</mark> at another.</h2>
+    <p class="cap">Kirks Sugar Free Pasito 10 × 375 mL on 14 Nov 2026: $16.00 at Woolworths, $8.00 half price at Coles.</p>
+    <blockquote class="quote"><p>The same pack was $16 at one supermarket and half price at another. No app showed my whole list with what was on special where, so I built one.</p><cite>Matt, who made SpecialList</cite></blockquote>
+    <ol class="feats">
+      <li><a href="#brand"><svg class="fi" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="14" y="4" width="13" height="15" rx="2.5" fill="#FFFFFF"/>
+<rect x="9.5" y="8.5" width="13" height="15" rx="2.5" fill="#FFFFFF"/>
+<rect x="5" y="13" width="13" height="15" rx="2.5" fill="#FFD400"/>
+<path d="M8 20.5l2.5 2.5 4.5-5.5"/>
+</svg>Whole brands</a></li>
+      <li><a href="#lists"><svg class="fi" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M12 12V6.5h11.5A2.5 2.5 0 0 1 26 9v3" fill="#FFFFFF"/>
+<path d="M12 12h13.5a2.5 2.5 0 0 1 2.5 2.5v11a2.5 2.5 0 0 1-2.5 2.5h-19A2.5 2.5 0 0 1 4 25.5v-19A2.5 2.5 0 0 1 6.5 4h3A2.5 2.5 0 0 1 12 6.5z" fill="#FFFFFF"/>
+<path d="M4 12V6.5A2.5 2.5 0 0 1 6.5 4h3A2.5 2.5 0 0 1 12 6.5V12" fill="#FFD400"/>
+<path d="M19 6.5V12M9 18h14M9 23h8"/>
+</svg>Your own lists</a></li>
+      <li><a href="#link"><svg class="fi" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6.5 9.5V11A2.5 2.5 0 0 0 9 13.5h14a2.5 2.5 0 0 0 2.5-2.5V9.5M16 9.5V18"/>
+<circle cx="6.5" cy="6.5" r="2.75" fill="#FFFFFF"/>
+<circle cx="16" cy="6.5" r="2.75" fill="#FFFFFF"/>
+<circle cx="25.5" cy="6.5" r="2.75" fill="#FFFFFF"/>
+<rect x="10" y="18" width="12" height="10" rx="2.5" fill="#FFD400"/>
+</svg>Linked across shops</a></li>
+      <li><a href="#alerts"><svg class="fi" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 22.5h16l-2-3v-6a6 6 0 0 0-12 0v6z" fill="#FFD400"/>
+<path d="M12 7.5V5M10 26a2.1 2.1 0 0 0 4 0M25 5v9m-3-3 3 3 3-3M22 18.5h6"/>
+</svg>Price alerts</a></li>
+      <li><a href="#history"><svg class="fi" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="4" y="4" width="24" height="24" rx="2.5" fill="#FFFFFF"/>
+<path d="M4 13h7v7h5v-7h5v7h7v5.5a2.5 2.5 0 0 1-2.5 2.5h-19A2.5 2.5 0 0 1 4 25.5z" fill="#FFD400"/>
+</svg>Price history</a></li>
+      <li><a href="#dates"><svg class="fi" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 13l6-7h12.5A2.5 2.5 0 0 1 25 8.5v9a2.5 2.5 0 0 1-2.5 2.5H10z" fill="#FFFFFF"/>
+<circle cx="11" cy="13" r="1.5"/>
+<circle cx="21" cy="21" r="6.5" fill="#FFD400"/>
+<path d="M21 17.5V21l2.5 1.5"/>
+</svg>Dated prices</a></li>
+    </ol>
+  </div>
+</section>
+
+<section class="sec center" id="brand" data-pose="p4-reading" data-say="Search a brand, tap Track all. New flavours join your list at the weekly check.">
+  <div class="in">
+    <div class="head"><span class="tag">1 · Whole brands</span><h2>A <span class="kp" data-ph="0" data-box="33.6,10.2,32.5,6.8">whole brand</span> in one tap</h2></div>
+    <div class="trio">
+      <div class="copy"><p class="said"><b>Why it's there</b>“I want to scroll every product on sale and see where it's available. I don't want to tap on every item to check.”</p></div>
+      <figure class="shots"><div class="ph"><video id="vid" data-once src="media/grid.mp4" poster="media/grid.webp" muted playsinline preload="auto" aria-label="The Tim Tam list in grid view, scrolling: 41 Tim Tams, the 27 on sale now first, each card with its price, shop and the day it was checked"></video></div><figcaption>41 Tim Tams, specials first</figcaption></figure>
+      <figure class="shots"><div class="ph"><video id="vid2" data-once src="media/kirks-grid.mp4" poster="media/kirks-grid.webp" muted playsinline preload="auto" aria-label="The Kirks Sugar Free list in grid view, scrolling: 26 drinks, 22 on sale now. Each card has all three shops: Coles' Creamy Soda and Lemon Squash 10-packs $8.00 half price, IGA $9.60, Woolworths $16.00, checked 17 Nov"></video></div><figcaption>Kirks, three shops on each card</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="sec center" id="lists" data-pose="p9-thumb" data-say="Swipe sideways to switch lists. Tap + to start a new one.">
+  <div class="in">
+    <div class="head">
+      <span class="tag">2 · Your own lists</span><h2>A <span class="kp" data-ph="1" data-box="1,12,98,7.5">different list</span> for different things</h2>
+      <p class="said"><b>Why it's there</b>“Make a list for a kind of food, one drink, a whole brand, or a mix of all three.”</p>
+    </div>
+    <div class="fan wait" id="fan">
+      <figure class="shots"><div class="ph"><img src="media/ice-creams.webp" width="540" height="1084" alt="The Ice creams list, 4 products, prices dated 16 Nov. On sale now at IGA: Peters Drumstick Chocolate Mint 4 pack and Peters Drumstick Caramel 4 pack, each IGA $9.00, save $0.90, was $9.90; Woolworths $9.90."></div><figcaption>A kind of food: Ice creams</figcaption></figure>
+      <figure class="shots"><div class="ph"><img src="media/coke-list.webp" width="540" height="1084" alt="Lists as tabs along the top: H2 juice 16 and Coca Cola 1.25l 47, and a plus to add another. The Coca Cola list opens on On sale now, 17, with Woolworths specials until Tue 17 Nov: Coca-Cola Caffeine Free Zero Sugar, Vanilla, Classic and Zero Sugar 1.25 L bottles, each $2.00, save $2.50, was $4.50, checked 16 Nov."></div><figcaption>One drink: Coca-Cola</figcaption></figure>
+      <figure class="shots"><div class="ph"><img src="media/kirks-compare.webp" width="540" height="1084" alt="The Kirks Sugar Free list in grid view, prices checked 17 Nov, each card with every shop's price. Kirks Orange Sugar Free Multipack Cans 10 pack: Coles $8.00 half price, was $16.00; IGA $9.60, save $6.70; Woolworths $16.00. Kirks Orange Sugar Free bottle 1.25 L: IGA $1.80, save $1.45; Coles $1.80. Kirks Sugar Free Pasito Passionfruit 1.25 L: IGA $1.80, save $1.45."></div><figcaption>A whole brand: Kirks</figcaption></figure>
+    </div>
+    <p class="cap mid">Each list is a tab along the top. Swipe between them, or tap + for a new one.</p>
+  </div>
+</section>
+
+<section class="sec lk" id="link" data-pose="p5-surprise" data-say="Tap Find at other shops. I suggest matches; you confirm each one.">
+  <div class="in lkg">
+    <div class="copy">
+      <span class="tag">3 · Linked across shops</span><h2>The same product at two shops, <span class="kp" data-ph="1" data-box="2.6,21.6,31,2.6">on one row</span></h2>
+      <p class="said"><b>Why it's there</b>“Meat pies from Coles and Woolworths showed up as two different items, so I couldn't compare them. It should find the match, and then I confirm it.”</p>
+    </div>
+    <div class="lkp">
+    <figure class="shots"><div class="ph"><video id="vid3" data-once src="media/find-lemonade.mp4" poster="media/find-lemonade.webp" muted playsinline preload="auto" aria-label="Find at other shops on Coles' Kirks Lemonade Zero Sugar 10-pack, $8.00. The app asks Same product? for IGA's Kirks Sugar Free Lemonade Multipack, and Link them links it, then Woolworths too. The product page then shows 3 shops, each checked 16 Nov: Coles $8.00 half price, was $16.00; IGA $9.60, save $6.70; Woolworths $16.00, 2 for $22.70."></video></div><figcaption>Find at other shops, then Link them</figcaption></figure>
+    <figure class="shots"><div class="ph"><img src="media/link-done.webp" width="540" height="1084" alt="Product details: prices at 2 shops. Woolworths $6.00, 2 for $9.00, checked 12 Nov. Coles $6.00, pick any 2 for $8, checked 12 Nov. Unlink Coles."></div><figcaption>Both prices on one product. Unlink undoes it.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="sec alerts center" id="alerts" data-pose="p1-phone" data-say="Tap Watch price on a product and set what you&#39;d pay. Alerts start off.">
+  <div class="in">
+    <div class="head">
+      <span class="tag" style="background:var(--white)">4 · Price alerts</span><h2>Your phone tells you <span class="kp" data-ph="1" data-box="15,19.4,58.5,2.9">when the price gets there</span></h2>
+      <p class="said"><b>Why it's there</b>“One week the app missed some specials, and I bought things at normal price. I wanted it to tell me, like a notification.”</p>
+      <p class="cap">Alerts are off until you turn them on.</p>
+    </div>
+    <div class="duo wait" id="duo">
+      <figure class="note" hidden><img src="media/alert-card.webp" width="1020" height="318" alt="Notification from SpecialList at 3:08 pm: Price target reached. 1 new target hit. Open SpecialList for the shop, price and check date."></figure>
+      <figure class="shots"><div class="ph"><img src="media/alert-watch.webp" width="540" height="1084" alt="Price watches: weekly background checks are on. Last successful background check today 3:08 pm. Arnott's Tim Tam Biscuits Gluten Free, at or below $4.00 per pack."></div><figcaption>Set your price</figcaption></figure>
+      <figure class="shots"><div class="ph"><img src="media/alert-updates.webp" width="540" height="1084" alt="Since your last check: new price updates 1. Arnott's Tim Tam Biscuits Gluten Free, IGA, $3.85, target $4.00 reached, checked today 3:08 pm."></div><figcaption>Get the alert</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="sec dark" id="history" data-pose="p10-squint" data-say="Open any product to see every price I&#39;ve recorded and how often it was on special.">
+  <div class="in hist">
+    <div class="copy">
+      <span class="tag">5 · Price history</span>
+      <h2>Every price it has seen, <span class="kp" data-ph="0" data-box="2.6,22.5,43.5,2.8">on one chart</span></h2>
+      <p class="said"><b>Why it's there</b>“How will it show the price history of an item? Show the normal price too, for example on sale for $7.95, normally $10.”</p>
+      <div class="hcrop" data-go role="img" aria-label="The app's price history chart for Kirks Sugar Free Pasito at Coles: the price jumps between $16.00 and $8.00. Lowest recorded $8.00, most often $16.00, highest $16.00."><img src="media/history.webp" width="540" height="1084" alt=""></div>
+      <p class="cap">Kirks Sugar Free Pasito at Coles, every check up to 1 Nov 2026.</p>
+    </div>
+    <figure class="shots"><div class="ph"><img src="media/history.webp" width="540" height="1084" alt="Price history at Coles for Kirks Sugar Free Pasito: the line jumps between $16.00 and $8.00. Lowest recorded $8.00, most often recorded $16.00, highest $16.00. On special 8 of 16 checks. Every check: 1 Nov $8.00 on sale, 28 Oct $8.00 on sale, 21 Oct $16.00."></div></figure>
+  </div>
+</section>
+
+<section class="sec" id="dates" data-pose="p3-puffed" data-say="Amber means not checked since specials changed. Open your list and I&#39;ll check again.">
+  <div class="in split">
+    <div class="copy">
+      <span class="tag">6 · Dated prices</span>
+      <h2>Every price says <span class="kpd">when it was checked</span></h2>
+      <p class="said"><b>Why it's there</b>“Coles and Woolworths change their specials once a week, on Wednesday morning. Have a last-updated date on the list.”</p>
+      <div class="tick" data-go role="img" aria-label="Kirks Sugar Free Pasito at Coles, $8.00, checked Saturday 14 Nov. The calendar turns to Wednesday 18 Nov, when Coles' new specials start, and the price turns amber until it is checked again.">
+        <div class="cal"><span class="d1">Sat<b>14</b>Nov</span><span class="d2">Wed<b>18</b>Nov</span></div>
+        <div class="tkt"><b>$8.00</b><div class="lb"><span class="l1">Coles · checked 14 Nov</span><span class="l2">Checked 14 Nov · check again</span></div></div>
+      </div>
+      <p class="cap">Specials change Wednesday. Unchecked prices turn amber.</p>
+      <h3>Your own Coles and IGA</h3>
+      <div class="pins" data-go role="img" aria-label="Coke 1.25 L on 3 Nov 2026: $4.50 at the Coles website's default store, $2.00 at Coles North Perth.">
+        <p class="pin"><b>$4.50</b><span>Coles default store · 3 Nov</span></p>
+        <p class="pin p2"><b>$2.00</b><span>Coles North Perth · 3 Nov</span></p>
+      </div>
+    </div>
+    <figure class="reel" role="img" aria-label="The Shops tab at Coles, 14 Nov 2026. At 2:02 am the prices are amber and say Old store price, 12 Nov. At 2:22 am, after the check, they are black and say 14 Nov.">
+      <div class="rscr">
+        <div class="st" data-line="Before the check: prices from the old store, in amber." data-hold="3.6"><div class="rz"><img src="media/dates-old.webp" width="540" height="1084" alt=""><i class="rhl" data-at="1" style="left:23.6%;top:33.9%;width:41.5%;height:2.4%"></i></div></div>
+        <div class="st cur" data-line="After the check: black, with the day it was checked."><div class="rz"><img src="media/dates-new.webp" width="540" height="1084" alt=""><i class="rhl on" data-at="1" style="left:34.2%;top:31.5%;width:11.8%;height:2.4%"></i></div></div>
+      </div>
+      <p class="rsay" aria-live="polite"></p>
+      <button class="replay" type="button">↻ Play again</button>
+    </figure>
+  </div>
+</section>
+
+<section class="sec join" id="join" data-pose="p6-lever" data-say="The beta is for Android phones. Leave your Gmail address and Matt will send the link.">
+  <div class="in">
+    <div class="copy">
+      <span class="tag" style="background:var(--white)">Android beta</span>
+      <h2>Try SpecialList before its public release</h2>
+      <p>Google Play runs the test, so use the Gmail address on your phone.</p>
+      <form id="form" novalidate>
+        <label for="mail">Your Gmail address</label>
+        <input id="mail" name="mail" type="email" placeholder="you@gmail.com" autocomplete="email" required aria-describedby="next">
+        <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
+        <p class="cap" id="next">Matt adds you to the test on Google Play and emails you the install link. Your address reaches Matt by email through FormSubmit and is used only for the beta.</p>
+        <div><button class="btn" type="submit">Join the beta</button></div>
+        <p class="sent" id="sent" role="status" hidden></p>
+      </form>
+    </div>
+    <ul class="facts">
+      <li><b>No account needed</b>Your lists stay on your phone, and you keep the backup.</li>
+      <li><b>Prices from the shops' websites</b>Shelf prices can differ, so tap any item to open the shop's own page.</li>
+    </ul>
+    <div class="also">
+      <h3>Also in the app</h3>
+      <ul class="facts">
+        <li><b>Barcode scan</b></li>
+        <li><b>Loyalty cards</b></li>
+        <li><b>Compare sizes</b></li>
+        <li><b>Aisle notes</b></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer><div class="in"><p>SpecialList is an independent app. It is not affiliated with, endorsed by or sponsored by any supermarket. Shop names and logos belong to their owners. Every screen and clip on this page is from the app, filmed 1 to 17 Nov 2026. Prices are as they were on the day shown and may have changed since.</p></div></footer>
+
+<div class="dock" id="dock">
+  <div class="in">
+    <div class="mag" id="mag" aria-hidden="true"><img id="magImg" src="img/p7-talk.webp" alt=""></div>
+    <p class="bubble" id="bubble" aria-hidden="true">I'm Maggie. Save what you buy; each week I show what's on special.</p>
+    <a class="btn" href="#join">Join the beta</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)};
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.documentElement.classList.add('js');
+
+  // Drawn graphics: the history squares are made here, then each graphic plays once when it comes into view.
+  var gos=[].slice.call(document.querySelectorAll('[data-go]'));
+  if(reduce||!('IntersectionObserver' in window))gos.forEach(function(g){g.classList.add('go')});
+  else{var gio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('go');gio.unobserve(e.target)}})},{threshold:.35});gos.forEach(function(g){gio.observe(g)})}
+
+  // Maggie: one line per section. She ducks behind the dock and pops up with the next pose.
+  var secs=[].slice.call(document.querySelectorAll('[data-say]')),cur=-1,swapT=null;
+  var mag=$('#mag'),img=$('#magImg'),bub=$('#bubble'),dock=$('#dock');
+  secs.forEach(function(s){new Image().src='img/'+s.dataset.pose+'.webp'});
+  function setSec(k){
+    if(k===cur)return;cur=k;var s=secs[k];
+    clearTimeout(swapT);
+    if(reduce){img.src='img/'+s.dataset.pose+'.webp';bub.textContent=s.dataset.say;return}
+    mag.classList.add('dn');bub.classList.add('fade');
+    swapT=setTimeout(function(){img.src='img/'+s.dataset.pose+'.webp';bub.textContent=s.dataset.say;mag.classList.remove('dn');bub.classList.remove('fade')},170);
+  }
+
+  function onScroll(){
+    var vh=innerHeight,k=0;
+    for(var i=0;i<secs.length;i++){if(secs[i].getBoundingClientRect().top<=vh*.45)k=i}
+    setSec(k);
+    // One Join button at a time: the dock's hides only while the hero's or the form's own button can be seen above it.
+    var top=vh-dock.offsetHeight;
+    function seen(el){var r=el.getBoundingClientRect();return r.bottom>0&&r.top<top}
+    dock.classList.toggle('at-form',seen(formBtn));
+    dock.classList.toggle('at-top',seen(heroBtn));
+  }
+  var queued=false,heroBtn=$('#heroBtn'),formBtn=$('#form .btn');
+  function mark(){if(!queued){queued=true;requestAnimationFrame(function(){queued=false;onScroll()})}}
+  addEventListener('scroll',mark,{passive:true});addEventListener('resize',mark);
+  onScroll();
+
+  // Reels: each step is a real clip or screen. A clip's marks fire at its own time (data-at, seconds into
+  // the clip); a screen's marks fire that long after it appears, and it holds for data-hold seconds. The
+  // last step stays. Without motion, or without the script, the last step shows with every mark on.
+  [].forEach.call(document.querySelectorAll('.reel'),function(r){
+    var st=[].slice.call(r.querySelectorAll('.st')),rsay=r.querySelector('.rsay'),again=r.querySelector('.replay'),T=[],raf=0,end=st.length-1;
+    function marks(s){return [].slice.call(s.querySelectorAll('[data-at]'))}
+    function on(m){m.classList.add('on')}
+    function stop(){T.forEach(clearTimeout);T=[];cancelAnimationFrame(raf);r.querySelectorAll('video').forEach(function(v){v.pause();v.onended=null})}
+    function show(k,all){
+      st.forEach(function(s,i){s.classList.toggle('cur',i===k);marks(s).forEach(function(m){m.classList.toggle('on',!!all&&i===k)})});
+      rsay.textContent=st[k].dataset.line;rsay.classList.remove('new');void rsay.offsetWidth;rsay.classList.add('new');
+    }
+    function run(k){
+      show(k);var s=st[k],v=s.querySelector('video'),ms=marks(s);
+      function next(){if(k<end)T.push(setTimeout(function(){run(k+1)},600))}
+      if(v){
+        v.currentTime=0;
+        (function watch(){ms.forEach(function(m){if(v.currentTime>=+m.dataset.at)on(m)});raf=requestAnimationFrame(watch)})();
+        v.onended=function(){cancelAnimationFrame(raf);ms.forEach(on);next()};
+        var p=v.play();
+        // A phone that refuses to play shows the clip's last frame and carries on.
+        if(p&&p.catch)p.catch(function(){cancelAnimationFrame(raf);v.currentTime=v.duration||99;ms.forEach(on);T.push(setTimeout(next,2500))});
+      }else{
+        ms.forEach(function(m){T.push(setTimeout(function(){on(m)},m.dataset.at*1000))});
+        T.push(setTimeout(next,(+s.dataset.hold||3)*1000));
+      }
+    }
+    if(again)again.addEventListener('click',function(){stop();run(0)});
+    if(!reduce&&'IntersectionObserver' in window){
+      show(0);
+      var ro=new IntersectionObserver(function(es){if(es[0].isIntersecting){ro.disconnect();run(0)}},{threshold:.6});ro.observe(r.querySelector('.rscr'));
+    }else{
+      show(end,true);
+      r.querySelectorAll('video').forEach(function(v){v.controls=true});
+    }
+  });
+
+  // The lists fan out and the notification drops in, once each, when they come into view.
+  // Without the script they are shown in place.
+  ['#fan','#duo'].forEach(function(s){
+    var el=$(s);
+    if(reduce||!('IntersectionObserver' in window)){el.classList.remove('wait');return}
+    var o=new IntersectionObserver(function(es){if(es[0].isIntersecting){o.disconnect();setTimeout(function(){el.classList.remove('wait')},1200)}},{threshold:.5});o.observe(el);
+  });
+
+  // Section videos play once while most of each is on screen, then stay on their last frame.
+  ['#vid','#vid2','#vid3'].forEach(function(s){
+    var vid=$(s);
+    if(!reduce&&'IntersectionObserver' in window){
+      var vo=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)vid.play().catch(function(){});else vid.pause()})},{threshold:.6});
+      vo.observe(vid);vid.onended=function(){vo.disconnect()};
+    }else vid.controls=true;
+  });
+
+  // Beta sign-up: the address goes to Matt by email through FormSubmit (owner, 22 Nov 2026).
+  $('#form').addEventListener('submit',function(e){
+    e.preventDefault();var m=$('#mail'),b=this.querySelector('button'),out=$('#sent');
+    if(!m.checkValidity()){m.reportValidity();return}
+    if(this._honey.value)return;
+    b.disabled=true;out.hidden=false;out.textContent='Sending…';
+    fetch('https://formsubmit.co/ajax/mdgow23@gmail.com',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},
+      body:JSON.stringify({email:m.value.trim(),_subject:'SpecialList beta sign-up',_template:'table'})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok||String(j.success)!=='true')throw 0})})
+      .then(function(){out.textContent='Thanks. Matt will email '+m.value.trim()+' the install link.';m.value=''})
+      .catch(function(){out.textContent="That didn't send. Please try again in a minute.";b.disabled=false});
+  });
+})();
+</script>
+
+<style>
+/* Tap a phone picture to see it large (owner 19 Nov). */
+.ph img,.ph video,.phone .app{cursor:zoom-in}
+#zoom{border:0;padding:0;background:transparent;max-width:none;max-height:none;width:100%;height:100%;overflow:hidden}
+#zoom::backdrop{background:rgba(0,0,0,.82)}
+#zoom[open]{display:flex;align-items:center;justify-content:center}
+#zoom img,#zoom video{display:block;max-height:calc(100vh - 32px);max-width:calc(100vw - 32px);width:auto;height:auto;border-radius:22px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#zoom button{position:fixed;top:12px;right:12px;width:48px;height:48px;border-radius:50%;border:2px solid #fff;background:#111;color:#fff;font:700 26px/1 sans-serif;cursor:pointer}
+#zoom button:focus-visible{outline:3px solid #ffd60a;outline-offset:2px}
+</style>
+<dialog id="zoom" aria-label="Enlarged screen"><button type="button" aria-label="Close">&times;</button><div id="zoomIn"></div></dialog>
+<script>
+/* Lightbox: tap or Enter on any phone screen shows it large; X, Esc or a tap outside closes. */
+(()=>{const d=document.getElementById('zoom'),box=document.getElementById('zoomIn');
+const open=el=>{box.textContent='';let n;
+  if(el.tagName==='VIDEO'){n=document.createElement('video');n.src=el.currentSrc||el.src;n.poster=el.poster;n.muted=true;n.playsInline=true;n.loop=true;n.autoplay=true;n.controls=true;n.setAttribute('aria-label',el.getAttribute('aria-label')||'')}
+  else{const i=el.tagName==='IMG'?el:el.querySelector('img');n=document.createElement('img');n.src=i.currentSrc||i.src;n.alt=i.alt||el.getAttribute('aria-label')||''}
+  box.append(n);d.showModal()};
+document.querySelectorAll('.ph img,.ph video,.phone .app').forEach(el=>{el.tabIndex=0;el.setAttribute('role','button');
+  if(!el.getAttribute('aria-label')&&el.alt)el.setAttribute('aria-label',el.alt);
+  el.addEventListener('click',()=>open(el));el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(el)}})});
+d.addEventListener('click',e=>{if(e.target!==box.firstChild)d.close()});
+d.addEventListener('close',()=>{box.textContent=''});})();
+</script>
+
+<style>
+/* MOCK, 19 Nov: Fable version 1's hero look (white label cards, yellow numbered pins, long arms to the
+   screen) on today's page, animated once: for each point the pin pops, its arm draws, then its card slides in. */
+.demo2{margin:0;display:grid;grid-template-columns:290px 270px;column-gap:72px;align-items:center;position:relative}
+.demo2 .stand{display:grid;min-width:0}
+.demo2 .ledge{margin-inline:-20px}
+.hpin{position:absolute;z-index:2;width:9%;aspect-ratio:1;translate:-10% -50%;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);
+  box-shadow:0 0 0 2px var(--white);display:grid;place-items:center;font:800 15px/1 var(--cond);color:var(--ink);animation:pinIn .45s cubic-bezier(.2,.9,.3,1.4) both}
+@keyframes pinIn{from{opacity:0;scale:.3}}
+.demo2 .ring{border-color:var(--ink);box-shadow:0 0 0 3px var(--yellow)}
+.calls{list-style:none;margin:0;padding:0;display:grid;gap:14px;align-content:center;min-width:0}
+.calls li{display:grid;grid-template-columns:30px minmax(0,1fr);column-gap:12px;background:var(--white);border:2px solid var(--ink);border-radius:14px;padding:12px 14px;
+  box-shadow:4px 4px 0 var(--ink);animation:cardIn .4s ease-out both}
+@keyframes cardIn{from{opacity:0;transform:translateX(18px)}}
+.calls li::before{content:attr(data-n);grid-row:span 2;width:28px;height:28px;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);display:grid;place-items:center;font:800 16px/1 var(--cond)}
+.calls b{font:700 21px/1.05 var(--cond)}
+.calls span{font-size:15px;line-height:1.35;color:var(--muted);margin-top:3px}
+#leads{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:3}
+#leads path{fill:none;stroke-linejoin:round;stroke-linecap:round}
+#leads path.go{stroke-dasharray:1;stroke-dashoffset:1;animation:arm .45s ease-out both}
+#leads circle{animation:pinIn .3s ease-out both}
+@keyframes arm{to{stroke-dashoffset:0}}
+.ring.r1,.p1{animation-delay:.3s}  #leads .a1{animation-delay:.6s}  .k1{animation-delay:.95s}
+.ring.r2,.p2{animation-delay:1.3s} #leads .a2{animation-delay:1.6s} .k2{animation-delay:1.95s}
+.ring.r3,.p3{animation-delay:2.3s} #leads .a3{animation-delay:2.6s} .k3{animation-delay:2.95s}
+.ring.r4,.p4{animation-delay:3.3s} #leads .a4{animation-delay:3.6s} .k4{animation-delay:3.95s}
+@media (max-width:1180px){.demo2{grid-template-columns:270px 250px;column-gap:56px}}
+@media (max-width:1040px){.demo2{justify-self:center}}
+/* Narrow screens: the cards stack under the phone and the numbers match them; no arms. */
+@media (max-width:640px){
+  .demo2{grid-template-columns:minmax(0,1fr);row-gap:22px;justify-items:center}
+  .demo2 .stand{width:min(280px,100%)}
+  .calls{width:100%;max-width:420px}
+  .calls b{font-size:19px}
+  #leads{display:none}
+}
+</style>
+<script>
+/* MOCK: arms from each pin to its card, drawn only when the cards sit beside the phone. At rest the
+   screen is clean: no pins, rings or arms. When the hero comes into view each point plays once in turn
+   (ring and pin pop, arm grows out to the card), then all clear. Pointing at or tapping a card brings
+   back its ring, pin and arm. */
+(()=>{const demo=document.getElementById('demo2'),svg=document.getElementById('leads'),
+  pins=[...demo.querySelectorAll('.hpin')],cards=[...demo.querySelectorAll('.calls li')],phone=demo.querySelector('.phone');
+  const list=demo.querySelector('.calls');
+  function draw(){const ph=phone.getBoundingClientRect();
+    if(list.getBoundingClientRect().left<ph.right){svg.innerHTML='';return}
+    const f=demo.getBoundingClientRect();
+    let out='';pins.forEach((p,i)=>{const a=p.getBoundingClientRect(),c=cards[i].getBoundingClientRect();
+      const x1=a.left+a.width/2-f.left,y1=a.top+a.height/2-f.top,mx=ph.right-f.left+10,x2=c.left-f.left-2,y2=c.top+c.height/2-f.top,k=(x2-mx)*.6;
+      /* drawn from the card toward the phone: a smooth bend down (or up) to the spot's height, then straight in */
+      const d=`M${x2} ${y2}C${x2-k} ${y2} ${mx+k} ${y1} ${mx} ${y1}H${x1}`;
+      out+=`<path pathLength="1" d="${d}" stroke="#fff" stroke-width="6" class="a${i+1}"/><path pathLength="1" d="${d}" stroke="#121212" stroke-width="2.2" class="a${i+1}"/>`;});
+    svg.innerHTML=out;}
+  draw();addEventListener('load',draw);addEventListener('resize',draw);document.fonts&&document.fonts.ready.then(draw);
+  const show=k=>{for(let n=1;n<5;n++)demo.classList.toggle('show'+n,n===k);if(k)cards[k-1].classList.add('seen')};
+  let timers=[];const stop=()=>{timers.forEach(clearTimeout);timers=[];list.classList.remove('pre')};
+  /* Intro: the headline comes in word by word. When "special" lands it is marked, and the "Specials at the
+     top" card, its arm and its spot on the phone show first; then the other three in turn, then all clear. */
+  const h1=document.querySelector('.hero h1'),reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!reduce){const t=h1.textContent;h1.setAttribute('aria-label',t);
+    h1.innerHTML=t.split(' ').map((w,i)=>`<span class="w${w==='special'?' kw':''}" style="--i:${i}" aria-hidden="true">${w}</span>`).join(' ');
+    list.classList.add('pre');
+    const at=(ms,fn)=>timers.push(setTimeout(fn,ms));
+    at(1500,()=>show(1));at(3000,()=>{h1.classList.add('lit');show(2)});
+    at(4500,()=>show(3));at(6000,()=>show(4));at(7700,()=>{show(0);stop()});}
+  const o=new MutationObserver(()=>{if(demo.classList.contains('go')){o.disconnect();draw()}});
+  o.observe(demo,{attributes:true});
+  cards.forEach((el,i)=>{el.tabIndex=0;
+    el.addEventListener('pointerenter',()=>{stop();show(i+1)});el.addEventListener('pointerleave',()=>show(0));
+    el.addEventListener('focus',()=>{stop();show(i+1)});el.addEventListener('blur',()=>show(0));
+    el.addEventListener('click',()=>{stop();show(demo.classList.contains('show'+(i+1))?0:i+1)})});
+  if(reduce)list.classList.remove('pre');
+})();
+</script>
+<style>
+/* MOCK, 22 Nov (owner yes): shorter phone layout. One phone in Whole brands and Linked, the chart without
+   the second history screen, and Dated prices without the store pins. Desktop keeps them all. */
+@media (max-width:640px){
+  #brand .trio>.shots:last-child,.lkp>.shots:last-child,.hist>figure.shots,#dates h3,#dates .pins{display:none}
+  .lkp .shots{max-width:260px}
+}
+</style>
+
+<style>
+/* MOCK, 22 Nov (owner): the screen rests clean. Rings, pins and arms show only for the point being
+   played or pointed at: ring and pin pop, then the arm grows from behind the pin out to its card.
+   Pins sit above the arms. Cards fit their words and stand apart. The phone is whole, dated below. */
+.demo2 .phone{border-bottom:9px solid var(--ink);border-radius:34px}
+.hdate{text-align:center;margin-top:10px;white-space:nowrap}
+.demo2 .ring,.demo2 .hpin{opacity:0;animation:none;transition:opacity .2s,scale .2s}
+.demo2 .hpin{z-index:4;scale:.4}
+#leads path{opacity:1;stroke-dasharray:1;stroke-dashoffset:1;animation:none;transition:stroke-dashoffset .25s ease-in}
+.demo2.show1 :is(.r1,.p1),.demo2.show2 :is(.r2,.p2),.demo2.show3 :is(.r3,.p3),.demo2.show4 :is(.r4,.p4){opacity:1;scale:1}
+#demo2.show1 #leads .a1,#demo2.show2 #leads .a2,#demo2.show3 #leads .a3,#demo2.show4 #leads .a4{stroke-dashoffset:0;transition:stroke-dashoffset .55s ease-out .18s}
+.demo2.show1 .k1,.demo2.show2 .k2,.demo2.show3 .k3,.demo2.show4 .k4{background:var(--yellow)}
+.calls{gap:30px;justify-items:start}
+.calls li{width:fit-content;max-width:100%;cursor:pointer;transition:background .2s}
+@media (prefers-reduced-motion:reduce){.demo2 .ring,.demo2 .hpin,#leads path{transition:none!important}}
+</style>
+
+<style>
+/* MOCK, 22 Nov (owner): Price alerts fits one screen. The drawn target graph is gone; words sit left,
+   the notification and two phones right. */
+@media (min-width:900px){
+  .alerts .in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,500px);gap:56px;align-items:center}
+  .alerts .head{justify-items:start;text-align:left;margin:0}
+  .alerts .duo{margin:0;max-width:500px;padding-top:110px}
+  .alerts .duo .ph{max-width:220px}
+}
+</style>
+
+<style>
+/* MOCK, 22 Nov (owner): cards sit above the arms and level with the spot each points at; the arm grows
+   from the card to the phone, then the ring and number pop where it lands. */
+.calls{position:relative;z-index:5}
+.demo2.show1 :is(.r1,.p1),.demo2.show2 :is(.r2,.p2),.demo2.show3 :is(.r3,.p3),.demo2.show4 :is(.r4,.p4){transition:opacity .2s .55s,scale .25s .55s}
+#demo2.show1 #leads .a1,#demo2.show2 #leads .a2,#demo2.show3 #leads .a3,#demo2.show4 #leads .a4{transition:stroke-dashoffset .55s ease-out}
+</style>
+
+<style>
+/* MOCK, 22 Nov (owner): feature pills carry Fable's drawn icons instead of numbers. */
+.feats a::before{content:none}
+.feats a{padding-left:8px}
+.feats .fi{flex:none;width:30px;height:30px}
+.feats a:hover{background:#FFF1A6}
+</style>
+
+<style>
+/* MOCK, 22 Nov (owner): cards evenly spaced again; arms bend smoothly from card to spot. The headline
+   comes in word by word, "special" gets a yellow mark, and its card and arm follow. Cards appear as
+   their point plays. */
+.calls{align-self:center}
+.calls li{display:flex;align-items:center;gap:12px}
+.calls li::before{flex:none}
+.hero h1 .w{display:inline-block;animation:wIn .45s ease-out calc(var(--i)*110ms + .15s) both}
+@keyframes wIn{from{opacity:0;translate:0 .35em}}
+.hero h1 .kw{background:linear-gradient(var(--yellow),var(--yellow)) no-repeat 0 88%/0% 38%;transition:background-size .45s ease-out}
+.hero h1.lit .kw{background-size:100% 38%}
+.calls.pre li{opacity:0;translate:18px 0;animation:none;transition:opacity .35s,translate .35s,background .2s}
+.calls.pre li.seen{opacity:1;translate:0}
+/* Lists: pointing at a phone brings it to the front where it stands; tapping opens it large. */
+.fan .shots{position:relative;cursor:zoom-in}
+.fan .shots:hover,.fan .shots:focus-within{z-index:3}
+.fan .shots:hover .ph,.fan .shots:focus-within .ph{box-shadow:0 14px 0 rgba(18,18,18,.22)}
+/* Dated prices: arms from the ticket and the store prices to where each happens on the phone. */
+#dates .split{position:relative}
+#dleads{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:3}
+#dleads path{fill:none;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .7s ease-out}
+#dates.arms #dleads path{stroke-dashoffset:0}
+#dates.arms #dleads path.b2{transition-delay:.9s}
+.dtgt{position:absolute;z-index:2;border:3px solid var(--ink);border-radius:8px;box-shadow:0 0 0 3px var(--yellow);opacity:0;transition:opacity .25s .6s;pointer-events:none}
+#dates.arms .dtgt{opacity:1}
+#dates.arms .dtgt.b2{transition-delay:1.5s}
+#dates .tkt,#dates .pins .pin{position:relative;z-index:4}
+@media (prefers-reduced-motion:reduce){#dleads path,.dtgt{transition:none}}
+</style>
+<script>
+/* MOCK: Dated prices. The amber ticket points at the same amber "Old store price" line on the phone, and
+   the store prices point at the store chosen at the top ("I'm at Coles"). Drawn only when the phone sits
+   beside the words; each arm grows once, then stays. */
+(()=>{const sec=document.getElementById('dates'),box=sec.querySelector('.split'),scr=sec.querySelector('.rscr');
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='dleads';svg.setAttribute('aria-hidden','true');box.append(svg);
+  const tg=(l,t,w,h,c)=>{const i=document.createElement('i');i.className='dtgt '+c;i.style.cssText=`left:${l}%;top:${t}%;width:${w}%;height:${h}%`;scr.append(i);return i};
+  const pairs=[[sec.querySelector('.tkt'),tg(32.5,31.2,13.5,2.8,'b1'),'b1'],[sec.querySelector('.pins .p2'),tg(15,6.3,25.5,6,'b2'),'b2']];
+  function draw(){const f=box.getBoundingClientRect();let out='';
+    pairs.forEach(([from,to,c])=>{const a=from.getBoundingClientRect(),b=to.getBoundingClientRect();
+      if(!a.width||b.left<a.right+40)return;
+      const x1=a.right-f.left,y1=a.top+a.height/2-f.top,x2=b.left-f.left-4,y2=b.top+b.height/2-f.top,k=(x2-x1)*.5;
+      const d=`M${x1} ${y1}C${x1+k} ${y1} ${x2-k} ${y2} ${x2} ${y2}`;
+      out+=`<path pathLength="1" d="${d}" stroke="#fff" stroke-width="6" class="${c}"/><path pathLength="1" d="${d}" stroke="#121212" stroke-width="2.2" class="${c}"/>`;});
+    svg.innerHTML=out;sec.querySelectorAll('.dtgt').forEach(t=>t.hidden=!out)}
+  draw();addEventListener('load',draw);addEventListener('resize',draw);document.fonts&&document.fonts.ready.then(draw);
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches||!('IntersectionObserver' in window)){sec.classList.add('arms');return}
+  const o=new IntersectionObserver(es=>{if(es[0].isIntersecting){o.disconnect();draw();setTimeout(()=>sec.classList.add('arms'),1800)}},{threshold:.4});o.observe(box);
+})();
+</script>
+
+<style>
+/* MOCK, 22 Nov (owner): livelier entrances. Headline words spring up; "special" gets a yellow swipe and a
+   small bounce before its card and arm show. */
+.hero h1 .w{animation:wIn .6s cubic-bezier(.2,1.4,.4,1) calc(var(--i)*90ms + .1s) both}
+@keyframes wIn{0%{opacity:0;translate:0 .7em;rotate:6deg;filter:blur(5px)}70%{opacity:1;filter:none}100%{translate:0;rotate:0}}
+.hero h1.lit .kw{animation:wIn .6s cubic-bezier(.2,1.4,.4,1) calc(var(--i)*90ms + .1s) both,kwPop .5s ease-out .05s}
+@keyframes kwPop{40%{scale:1.12}}
+/* Section headings: the key words get a yellow swipe and an arm grows from them to where it shows on the
+   phone; a ring marks the spot. It plays once when the section comes into view, fades after a few
+   seconds, and comes back while you point at the words. */
+.kp{background:linear-gradient(var(--yellow),var(--yellow)) no-repeat 0 90%/0% 36%;transition:background-size .45s ease-out;cursor:default}
+.kp.lit{background-size:100% 36%}
+.kleads{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:6}
+.kleads path{fill:none;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .3s ease-in,opacity .3s}
+.kon .kleads path{stroke-dashoffset:0;transition:stroke-dashoffset .75s ease-out .25s}
+.kring{position:absolute;z-index:3;border:3px solid var(--ink);border-radius:8px;box-shadow:0 0 0 3px var(--yellow);opacity:0;scale:.9;transition:opacity .2s,scale .2s;pointer-events:none}
+.kon .kring{opacity:1;scale:1;transition:opacity .25s .95s,scale .3s cubic-bezier(.2,1.5,.4,1) .95s}
+/* Price alerts: a real-size notification slides down over the phone, then the line it reported lights up. */
+.alerts .duo{padding-top:0}
+.ph img.hun{aspect-ratio:auto;position:absolute;z-index:2;left:3%;top:2%;width:94%!important;height:auto!important;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.25);translate:0 -130%;transition:translate .55s cubic-bezier(.2,1.2,.4,1);pointer-events:none}
+.ph img.hun.in{translate:0 0}
+.ahl{position:absolute;left:15%;top:19.4%;width:58.5%;height:2.9%;background:var(--yellow);mix-blend-mode:multiply;border-radius:2px;transform:scaleX(0);transform-origin:left;transition:transform .45s ease-out;pointer-events:none}
+.ahl.on{transform:none}
+@media (prefers-reduced-motion:reduce){.kp,.kleads path,.kring,.hun,.ahl{transition:none!important}}
+</style>
+<script>
+/* MOCK: heading key words point at the phone. Each .kp names a phone in its section (data-ph) and a box on
+   that screen in percent (data-box). The arm is skipped when that phone is hidden (narrow screens) or sits
+   level with the words. */
+(()=>{const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelectorAll('.kp').forEach(kp=>{
+    const sec=kp.closest('section'),ph=sec.querySelectorAll('.ph')[+kp.dataset.ph],[l,t,w,h]=kp.dataset.box.split(',');
+    sec.style.position='relative';
+    const ring=document.createElement('i');ring.className='kring';ring.style.cssText=`left:${l}%;top:${t}%;width:${w}%;height:${h}%`;ph.append(ring);
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','kleads');svg.setAttribute('aria-hidden','true');sec.append(svg);
+    function draw(){const f=sec.getBoundingClientRect(),a=kp.getBoundingClientRect(),b=ring.getBoundingClientRect();
+      if(!b.width){svg.innerHTML='';return}
+      const x1=a.left+a.width/2-f.left,y1=a.bottom-f.top+2;let x2,y2,d;
+      if(b.top>a.bottom+30){x2=b.left+b.width/2-f.left;y2=b.top-f.top-5;const k=(y2-y1)*.55;d=`M${x1} ${y1}C${x1} ${y1+k} ${x2} ${y2-k} ${x2} ${y2}`}
+      else{const sx=a.right-f.left+6,sy=a.top+a.height/2-f.top;x2=b.left-f.left-5;y2=b.top+b.height/2-f.top;const k=(x2-sx)*.45;d=`M${sx} ${sy}C${sx+k} ${sy} ${x2-k} ${y2} ${x2} ${y2}`}
+      svg.innerHTML=`<path pathLength="1" d="${d}" stroke="#fff" stroke-width="6"/><path pathLength="1" d="${d}" stroke="#121212" stroke-width="2.2"/>`}
+    draw();addEventListener('load',draw);addEventListener('resize',draw);document.fonts&&document.fonts.ready.then(draw);
+    let tm;const on=v=>{clearTimeout(tm);if(v)draw();kp.classList.toggle('lit',v);sec.classList.toggle('kon',v)};
+    kp.addEventListener('pointerenter',()=>on(true));
+    if(reduce||!('IntersectionObserver' in window)){kp.classList.add('lit');return}
+    const o=new IntersectionObserver(es=>{if(es[0].isIntersecting){o.disconnect();tm=setTimeout(()=>on(true),1200)}},{threshold:.45});o.observe(sec);
+  });
+  /* Price alerts: notification over the second phone, then the reported line lights up. */
+  const duo=document.getElementById('duo'),ph=duo.querySelectorAll('.ph')[1],note=document.querySelector('#duo .note img');
+  const hun=document.createElement('img');hun.className='hun';hun.src=note.src;hun.alt='';ph.append(hun);
+  const hl=document.createElement('i');hl.className='ahl';ph.append(hl);
+  const play=()=>{hun.classList.remove('in');hl.classList.remove('on');
+    setTimeout(()=>hun.classList.add('in'),1500);setTimeout(()=>hun.classList.remove('in'),5000);setTimeout(()=>hl.classList.add('on'),5500)};
+  if(reduce||!('IntersectionObserver' in window)){hl.classList.add('on');return}
+  const o=new IntersectionObserver(es=>{if(es[0].isIntersecting){o.disconnect();play()}},{threshold:.5});o.observe(ph);
+})();
+</script>
+<style>.calls{background:none!important;border:0!important;box-shadow:none!important}</style>
+<style>
+/* MOCK v11 (owner 22 Nov). Lists: hovering a phone tilts it in 3D and brings it to the middle; the others
+   step back. Leaving puts it back. No arm over the quote here. */
+#lists .kleads{display:none}
+.fan{perspective:1100px}
+.fan .shots{transition:transform .55s cubic-bezier(.2,.8,.3,1),filter .3s,opacity .3s;transform-style:preserve-3d}
+.fan .shots .ph{transition:box-shadow .3s}
+.fan .shots.pop{z-index:4}
+.fan .shots.pop .ph{box-shadow:0 26px 40px rgba(18,18,18,.28)}
+.fan .shots:nth-child(1).pop{transform:translate(100%,-14px) scale(1.12) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))!important}
+.fan .shots:nth-child(2).pop{transform:translateY(-14px) scale(1.12) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))!important}
+.fan .shots:nth-child(3).pop{transform:translate(-100%,-14px) scale(1.12) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))!important}
+.fan.has-pop .shots:not(.pop){filter:blur(1.5px) brightness(.9);opacity:.75}
+.fan.has-pop .shots:nth-child(2):not(.pop){transform:scale(.94)}
+@media (prefers-reduced-motion:reduce){.fan .shots{transition:none}}
+
+/* Whole brands, trial: soft focus instead of the yellow-and-black ring. The rest of the screen blurs and
+   dims, the spot stays sharp, with soft edges. */
+#brand .kring{display:none}
+.sf{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;transition:opacity .5s ease .5s;
+  backdrop-filter:blur(2.5px) brightness(.82);-webkit-backdrop-filter:blur(2.5px) brightness(.82)}
+#brand.kon .sf{opacity:1}
+</style>
+<script>
+(()=>{const fan=document.getElementById('fan'),reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  fan.querySelectorAll('.shots').forEach(s=>{
+    const on=v=>{s.classList.toggle('pop',v);fan.classList.toggle('has-pop',v);if(!v){s.style.removeProperty('--rx');s.style.removeProperty('--ry')}};
+    s.addEventListener('pointerenter',()=>on(true));s.addEventListener('pointerleave',()=>on(false));
+    s.addEventListener('focusin',()=>on(true));s.addEventListener('focusout',()=>on(false));
+    if(!reduce)s.addEventListener('pointermove',e=>{const r=s.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+      s.style.setProperty('--ry',(x*14).toFixed(1)+'deg');s.style.setProperty('--rx',(-y*10).toFixed(1)+'deg')})});
+  // soft focus mask: sharp ellipse at the spot, blurred everywhere else
+  const kp=document.querySelector('#brand .kp'),ph=document.querySelectorAll('#brand .ph')[+kp.dataset.ph||0];
+  const [l,t,w,h]=kp.dataset.box.split(',').map(Number),m=document.createElement('i');m.className='sf';
+  const g=`radial-gradient(ellipse ${w*.75}% ${h*1.1}% at ${l+w/2}% ${t+h/2}%,transparent 55%,#000 100%)`;
+  m.style.maskImage=g;m.style.webkitMaskImage=g;ph.append(m);
+})();
+</script>
+<style>
+/* MOCK v14 (owner 22 Nov): one pointer system across the page. In every section the heading's yellow key word
+   lights, one spot on the phone gets the same yellow highlighter stroke, then it settles. No arms, no rings, no
+   soft focus. Whole brands grows the list's own tab pill instead, because that pill is the point. */
+.kleads,#dleads,#dates .dtgt,.ahl,.sf{display:none!important}
+.kring{border:0!important;box-shadow:none!important;border-radius:2px;background:var(--yellow);mix-blend-mode:multiply;
+  opacity:1!important;scale:1!important;transform:scaleX(0);transform-origin:left;transition:transform .3s ease-in!important}
+.kon .kring{transform:none;transition:transform .45s ease-out .45s!important}
+#brand .kring{display:none}
+.kpd{background:linear-gradient(var(--yellow),var(--yellow)) no-repeat 0 90%/0% 36%;transition:background-size .45s ease-out}
+.kpd.lit{background-size:100% 36%}
+.alerts .kp{background-image:linear-gradient(#fff,#fff)}
+/* Lists: the hovered phone keeps its own place and angle, lifts and grows a little. */
+.fan .shots:nth-child(1).pop{transform:rotate(-5deg) translate(18%,0) scale(1.08) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))!important}
+.fan .shots:nth-child(2).pop{transform:translateY(-14px) scale(1.08) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))!important}
+.fan .shots:nth-child(3).pop{transform:rotate(5deg) translate(-18%,0) scale(1.08) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg))!important}
+@media (max-width:640px){
+  .fan .shots:nth-child(1).pop{transform:rotate(-5deg) translate(14%,-2px) scale(1.08)!important}
+  .fan .shots:nth-child(3).pop{transform:rotate(5deg) translate(-14%,-2px) scale(1.08)!important}
+}
+/* Whole brands: a copy of the tab pill, cut from the clip itself, sits exactly on the real one, then grows (Tim Tam,
+   then Kirks), then shrinks back. Both clips move the tab row up about 2s in, so it plays once the row has settled. */
+.pill{position:absolute;z-index:3;pointer-events:none;border-radius:8%/22%;opacity:0;scale:1;background:center/100% 100% no-repeat;
+  transition:scale .3s ease-in,opacity 0s .3s,box-shadow .3s}
+#brand.pp .pill{opacity:1;scale:1.35;box-shadow:0 3px 8px rgba(18,18,18,.25);transition:opacity 0s,scale .5s cubic-bezier(.2,1.6,.4,1) .05s,box-shadow .5s}
+#brand.pp .pill.p2{transition-delay:.4s,.45s,.45s}
+/* Dated prices: the ticket is outlined while the phone highlights the date it means; then the North Perth price
+   is outlined while "I'm at" is highlighted. */
+.hl{position:absolute;z-index:3;background:var(--yellow);mix-blend-mode:multiply;border-radius:2px;transform:scaleX(0);transform-origin:left;transition:transform .35s ease-out;pointer-events:none}
+#dates.f2 .hl.b2{transform:none}
+#dates .tkt,#dates .pin.p2{transition:box-shadow .3s,translate .3s;cursor:default}
+#dates:not(.f2):has(.st.cur .rhl.on) .tkt,#dates.f2 .pin.p2{box-shadow:0 0 0 3px var(--ink),0 0 0 7px var(--yellow);translate:0 -3px}
+/* Why it exists: the six feature pills come in one at a time, each with a small shake as it lands. Once only. */
+@media (prefers-reduced-motion:no-preference){
+  .js .feats li{opacity:0}
+  .feats.go2 li{animation:fLand .8s ease-out calc(var(--k)*950ms) both}
+}
+@keyframes fLand{0%{opacity:0;translate:0 -12px;rotate:0}25%{opacity:1;translate:0 0;rotate:0}43%{rotate:4deg}62%{rotate:-4deg}81%{rotate:2deg}100%{opacity:1;rotate:0}}
+@media (prefers-reduced-motion:reduce){.kring,.hl,.pill{transition:none!important}}
+</style>
+<script>
+(()=>{const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches,io=(el,t,fn)=>{
+    if(reduce||!('IntersectionObserver' in window))return fn(true);
+    const o=new IntersectionObserver(es=>{if(es[0].isIntersecting){o.disconnect();fn()}},{threshold:t});o.observe(el)};
+  // Whole brands: pill cut from each clip at 3s, placed over its spot (percent of the 540 x 1084 screen)
+  const pill=(ph,[l,t,w,h],src,c)=>{const p=document.createElement('i');p.className='pill '+c;
+    p.style.cssText=`left:${l}%;top:${t}%;width:${w}%;height:${h}%;background-image:url(${src})`;ph.append(p)};
+  const ph=document.querySelectorAll('#brand .ph'),brand=document.getElementById('brand'),gv=document.getElementById('vid');
+  pill(ph[0],[34.4,9.96,31.9,6.64],'media/timtam-pill.webp','p1');
+  pill(ph[1],[38.7,9.87,46.9,6.64],'media/kirks-pill.webp','p2');
+  if(!reduce){const go=()=>{if(gv.currentTime<2.2)return;gv.removeEventListener('timeupdate',go);
+    brand.classList.add('pp');setTimeout(()=>brand.classList.remove('pp'),2600)};gv.addEventListener('timeupdate',go)}
+  // Lists: pop in place (the v11 hover handler sets .pop)
+  // Dated prices
+  const sec=document.getElementById('dates'),kw=sec.querySelector('.kpd'),b2=document.createElement('i');
+  b2.className='hl b2';b2.style.cssText='left:3.3%;top:8.1%;width:10.7%;height:2.6%';sec.querySelector('.rscr').append(b2);
+  const pin=sec.querySelector('.pin.p2'),f2=v=>sec.classList.toggle('f2',v);
+  pin.addEventListener('pointerenter',()=>f2(true));pin.addEventListener('pointerleave',()=>f2(false));
+  io(sec.querySelector('.split'),.4,now=>{if(now){kw.classList.add('lit');return}
+    setTimeout(()=>kw.classList.add('lit'),1200)});
+  // Why it exists: feature pills land in turn
+  const f=document.querySelector('.feats');[...f.children].forEach((li,i)=>li.style.setProperty('--k',i));
+  io(f,.6,()=>f.classList.add('go2'));
+})();
+</script>
+<style>
+/* v15: one entrance on every section. Quote types in word by word (like the hero), phones slide in from the right. */
+#lists .kring{display:none}
+@media (prefers-reduced-motion:no-preference){
+  .feats.go2 li{animation-duration:.6s;animation-delay:calc(var(--k)*450ms)}
+  .js .tw{display:inline-block;opacity:0}
+  @keyframes twIn{0%{opacity:0;translate:0 .6em;rotate:5deg;filter:blur(4px)}70%{opacity:1;filter:none}100%{opacity:1;translate:0;rotate:0}}
+  .mo .tw{animation:twIn .5s cubic-bezier(.2,1.4,.4,1) calc(var(--i)*45ms + .15s) both}
+}
+</style>
+<script>
+(()=>{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const split=el=>{let i=0;const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT),nodes=[];
+    while(w.nextNode())if(!w.currentNode.parentElement.closest('b,cite'))nodes.push(w.currentNode);
+    nodes.forEach(n=>{const f=document.createElement('span');
+      n.textContent.split(/(\s+)/).forEach(p=>{if(!p)return;if(/^\s+$/.test(p)){f.append(p);return}
+        const s=document.createElement('span');s.className='tw';s.style.setProperty('--i',i++);s.textContent=p;f.append(s)});
+      n.replaceWith(f)})};
+  document.querySelectorAll('main .said, main .quote p').forEach(split);
+  document.querySelectorAll('main section').forEach(sec=>{
+    if(!('IntersectionObserver' in window))return sec.classList.add('mo');
+    const o=new IntersectionObserver(es=>{if(es[0].isIntersecting){o.disconnect();sec.classList.add('mo')}},{rootMargin:'0px 0px -25% 0px'});o.observe(sec)});
+})();
+</script>
+<style>
+/* v20: one motion pattern on every section. 1 quote types in, 2 phones slide in from the right (0.15s apart),
+   3 key word and its spot on the phone get the marker and keep it, 4 one moment of its own, then still. */
+@media (prefers-reduced-motion:no-preference){
+  .js :is(#brand .trio,.fan,.lkp,.duo,.hist,#dates .split)>:is(.shots,.reel){opacity:0}
+  .mo :is(#brand .trio,.fan,.lkp,.duo,.hist,#dates .split)>:is(.shots,.reel){opacity:1;animation:slideR .7s cubic-bezier(.2,1,.3,1) var(--d,0s) both}
+  .mo :is(.trio,.fan,.lkp,.duo)>.shots+.shots{--d:.15s}
+  .mo .fan>.shots+.shots+.shots{--d:.3s}
+}
+@keyframes slideR{from{opacity:0;translate:90px 0}}
+/* One hover: any phone lifts a little where it sits (the Lists fan keeps its own pop). */
+.shots>.ph{transition:translate .3s ease-out,scale .3s ease-out}
+:is(.trio,.lkp,.duo,.hist,.reel) .ph:hover{translate:0 -10px;scale:1.05}
+/* Price history: the line draws left to right, so the price is seen going up and down. */
+.hdraw{position:absolute;z-index:2;left:1.5%;top:26.5%;width:98%;height:20.5%;background:#FDF7F2;transform-origin:right;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){
+  .mo .hdraw{transform:scaleX(0);transition:transform 2.4s cubic-bezier(.45,0,.55,1) 1.6s}
+}
+@media (prefers-reduced-motion:reduce){.hdraw{display:none}}
+/* Dated prices: the screen flip is its one moment. Calendar, ticket and store cards sit still in their end state. */
+#dates .tick *,#dates .tkt,#dates .pin{animation:none!important}
+#dates .d1,#dates .l1{opacity:0}
+#dates .tkt,#dates .pin.p2{box-shadow:none!important;translate:none!important}
+#dates .hl{display:none}
+</style>
+<script>
+(()=>{const ph=document.querySelector('#history .ph'),d=document.createElement('i');d.className='hdraw';ph.append(d)})();
+</script>
+<style>
+/* Black section: the heading is yellow, so its marker sits under the words like a thick underline and the words turn white. */
+.dark .kp{background-position:0 100%;background-size:0% 12%;transition:background-size .45s ease-out,color .3s}
+.dark .kp.lit{background-size:100% 12%;color:#fff}
+</style>
